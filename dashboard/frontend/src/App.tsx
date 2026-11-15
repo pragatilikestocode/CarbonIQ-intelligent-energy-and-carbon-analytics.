@@ -1,63 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Navbar } from './components/common/Navbar';
 import { CommandCenter } from './components/modules/CommandCenter';
-import { DataCleaningModule } from './components/modules/DataCleaningModule';
+import { OverviewDashboard } from './components/modules/OverviewDashboard';
 import { EnergyIntelligenceModule } from './components/modules/EnergyIntelligenceModule';
+import { AnomalyDetectionModule } from './components/modules/AnomalyDetectionModule';
 import { CarbonIntelligenceModule } from './components/modules/CarbonIntelligenceModule';
+import { OptimizationModule } from './components/modules/OptimizationModule';
 import { SasViyaStudio } from './components/modules/SasViyaStudio';
-import { ReportingModule } from './components/modules/ReportingModule';
-import { dataService } from './services/dataService';
-import { DataSourceMode, ClusterTelemetry } from './types';
-import { Cpu, ShieldCheck, Heart, Sparkles, Layers, Zap, Leaf } from 'lucide-react';
+import { Layers, Zap, Leaf, ShieldCheck } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>('command');
-  const [dataSourceMode, setDataSourceMode] = useState<DataSourceMode>(dataService.getMode());
-  const [telemetry, setTelemetry] = useState<ClusterTelemetry>(dataService.getClusterTelemetry());
-
-  useEffect(() => {
-    // Poll telemetry every 10 seconds for realistic live feel
-    const interval = setInterval(() => {
-      setTelemetry(dataService.getClusterTelemetry());
-    }, 10000);
-
-    const unsubscribe = dataService.subscribe(() => {
-      setDataSourceMode(dataService.getMode());
-      setTelemetry(dataService.getClusterTelemetry());
-    });
-
-    return () => {
-      clearInterval(interval);
-      unsubscribe();
-    };
-  }, []);
-
-  const handleModeChange = (mode: DataSourceMode) => {
-    setDataSourceMode(mode);
-    dataService.setMode(mode);
-  };
+  const [activeTab, setActiveTab] = useState<string>('overview');
 
   return (
     <div className="min-h-screen bg-carbon-bg text-slate-100 flex flex-col justify-between bg-cyber-grid bg-[size:40px_40px] selection:bg-cyber-cyan selection:text-black">
       {/* Top Navigation */}
       <Navbar
-        telemetry={telemetry}
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        dataSourceMode={dataSourceMode}
-        onModeChange={handleModeChange}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        {activeTab === 'command' && (
-          <CommandCenter telemetry={telemetry} onNavigateTab={setActiveTab} />
-        )}
-        {activeTab === 'cleaning' && <DataCleaningModule />}
+        {activeTab === 'overview' && <OverviewDashboard />}
         {activeTab === 'energy' && <EnergyIntelligenceModule />}
+        {activeTab === 'anomalies' && <AnomalyDetectionModule />}
         {activeTab === 'carbon' && <CarbonIntelligenceModule />}
+        {activeTab === 'optimization' && <OptimizationModule />}
+        {activeTab === 'twin' && <CommandCenter />}
         {activeTab === 'sas' && <SasViyaStudio />}
-        {activeTab === 'reports' && <ReportingModule />}
       </main>
 
       {/* Futuristic Enterprise Footer */}
@@ -74,7 +45,7 @@ export const App: React.FC = () => {
               </span>
             </div>
             <p className="text-slate-400 text-[11px] max-w-md">
-              AI-Powered Data Center Energy & Carbon Intelligence. Monitoring, predicting, and optimizing high-density GPU computing infrastructure.
+              AI-Powered Data Center Energy &amp; Carbon Intelligence. Monitoring, predicting, and optimizing high-density GPU computing infrastructure.
             </p>
           </div>
 
@@ -94,14 +65,14 @@ export const App: React.FC = () => {
             </div>
           </div>
 
-          {/* System Provenance & Mode */}
+          {/* System Provenance */}
           <div className="text-right space-y-1">
             <div className="text-[11px] text-slate-400 flex items-center md:justify-end gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-cyber-neon" />
               <span>Architecture: Standalone Decoupled (SAS Viya Ready)</span>
             </div>
             <div className="text-[10px] text-slate-500">
-              Active Mode: <strong className="text-slate-300 uppercase">{dataSourceMode}</strong> • Calibration: NVIDIA DGX H100
+              Calibration: NVIDIA DGX H100
             </div>
           </div>
         </div>
@@ -109,5 +80,5 @@ export const App: React.FC = () => {
     </div>
   );
 };
-export default App;
 
+export default App;

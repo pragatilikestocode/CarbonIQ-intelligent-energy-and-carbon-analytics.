@@ -1,19 +1,7 @@
-import { ClusterTelemetry, ServerRack, GpuNode, WorkloadType } from '../types';
+import { ServerRack, GpuNode, WorkloadType } from '../types';
 
-export const mockTelemetry: ClusterTelemetry = {
-  totalGpus: 2048,
-  activeGpus: 1912,
-  offlineGpus: 136,
-  totalPowerDrawKw: 1468.4,
-  peakPowerKw: 1720.0,
-  averagePue: 1.14,
-  currentCarbonIntensity: 318.5, // gCO2/kWh (PJM Interconnection Grid)
-  dailyEmissionsKg: 11245.8,
-  efficiencyScore: 94.8,
-  dataCenterHealth: 'OPTIMAL',
-  activeJobsCount: 428,
-  lastUpdated: new Date().toISOString(),
-};
+// Note: The rack data below is an ILLUSTRATIVE 3D visualization scaffold.
+// Real workload/energy/emissions metrics are served by the FastAPI backend.
 
 const workloadOptions: WorkloadType[] = [
   'LLM Pretraining',
