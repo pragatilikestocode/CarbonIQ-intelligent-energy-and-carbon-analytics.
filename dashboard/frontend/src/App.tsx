@@ -7,6 +7,7 @@ import { AnomalyDetectionModule } from './components/modules/AnomalyDetectionMod
 import { CarbonIntelligenceModule } from './components/modules/CarbonIntelligenceModule';
 import { OptimizationModule } from './components/modules/OptimizationModule';
 import { SasViyaStudio } from './components/modules/SasViyaStudio';
+import { ExecutiveSummaryReport } from './components/modules/ExecutiveSummaryReport';
 import { Layers, Zap, Leaf, ShieldCheck } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -14,21 +15,17 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-carbon-bg text-slate-100 flex flex-col justify-between bg-cyber-grid bg-[size:40px_40px] selection:bg-cyber-cyan selection:text-black">
-      {/* Top Navigation */}
-      <Navbar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
+      <Navbar activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        {activeTab === 'overview' && <OverviewDashboard />}
-        {activeTab === 'energy' && <EnergyIntelligenceModule />}
-        {activeTab === 'anomalies' && <AnomalyDetectionModule />}
-        {activeTab === 'carbon' && <CarbonIntelligenceModule />}
-        {activeTab === 'optimization' && <OptimizationModule />}
-        {activeTab === 'twin' && <CommandCenter />}
-        {activeTab === 'sas' && <SasViyaStudio />}
+        {activeTab === 'overview'      && <OverviewDashboard />}
+        {activeTab === 'energy'        && <EnergyIntelligenceModule />}
+        {activeTab === 'anomalies'     && <AnomalyDetectionModule />}
+        {activeTab === 'carbon'        && <CarbonIntelligenceModule />}
+        {activeTab === 'optimization'  && <OptimizationModule />}
+        {activeTab === 'twin'          && <CommandCenter />}
+        {activeTab === 'sas'           && <SasViyaStudio />}
+        {activeTab === 'report'        && <ExecutiveSummaryReport />}
       </main>
 
       {/* Futuristic Enterprise Footer */}

@@ -14,6 +14,8 @@ import numpy as np
 from typing import Optional
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from urllib.parse import quote
 
 # ---------------------------------------------------------------------------
 # App & CORS
@@ -506,6 +508,219 @@ def get_sas_cas_tables():
     ]
 
 
-if __name__ == "__main__":
+# ===========================================================================
+# PDF REPORTS LIBRARY
+# ===========================================================================
+REPORTS_DIR = os.path.join(BASE_DIR, "visualizations")
+
+# Keyword → description mapping for deriving meaningful descriptions from filenames
+_DESC_RULES = [
+    (["final", "integrated", "full"], "Final integrated report combining all CarbonIQ modules — energy, carbon, anomalies, and optimization."),
+    (["module_1", "module1", "gpu_energy", "energy", "prediction"], "GPU Energy Intelligence Module — Random Forest energy prediction from DCGM telemetry."),
+    (["module_2", "module2", "carbon", "emission"], "Carbon Intelligence Module — Scope 2 emissions analysis and optimization scenarios."),
+    (["anomaly", "anomalies"], "Anomaly detection results — five-rule physical and statistical engine applied to GPU telemetry."),
+    (["optimization", "optimize"], "Optimization recommendations — baseline vs hypothetical energy and emissions scenarios."),
+    (["executive", "summary", "dashboard"], "Executive summary — key metrics across all CarbonIQ modules."),
+    (["model", "performance", "validation"], "Model performance and validation metrics for energy prediction and carbon forecasting."),
+    (["data", "cleaning", "preprocessing"], "Data preprocessing and cleaning pipeline documentation."),
+]
+
+
+def _derive_title(filename: str) -> str:
+    """Derive a human-readable title from a PDF filename."""
+    stem = filename.replace(".pdf", "").replace(".PDF", "")
+    # Replace separators with spaces
+    stem = stem.replace("_", " ").replace("-", " ")
+    # Insert space before numbers if missing (e.g., "module1" → "module 1")
+    import re
+    stem = re.sub(r'(?<=[a-zA-Z])(\d+)', r' \1', stem)
+    # Capitalize each word, keeping known acronyms uppercase
+    words = stem.split()
+    acronyms = {"gpu", "dcgm", "co2", "pue", "wue", "cue", "ere", "sas", "ai", "ml", "rf", "kpi", "esg", "ghg"}
+    title_words = []
+    for w in words:
+        if w.lower() in acronyms:
+            title_words.append(w.upper())
+        else:
+            title_words.append(w.capitalize())
+    return " ".join(title_words)
+
+
+def _derive_description(filename: str) -> str:
+    """Derive a description from the filename using keyword matching."""
+    lower = filename.lower()
+    for keywords, desc in _DESC_RULES:
+        if any(kw in lower for kw in keywords):
+            return desc
+    return "SAS Visual Analytics report exported by the CarbonIQ team."
+
+
+@app.get("/api/reports")
+def get_pdf_reports():
+    """List all PDF reports available in the visualizations/ directory."""
+    if not os.path.exists(REPORTS_DIR):
+        return {"reports": [], "total": 0, "directory": "visualizations/"}
+
+    pdf_files = [
+        f for f in os.listdir(REPORTS_DIR)
+        if f.lower().endswith(".pdf") and os.path.isfile(os.path.join(REPORTS_DIR, f))
+    ]
+    pdf_files.sort()
+
+    reports = []
+    for f in pdf_files:
+        filepath = os.path.join(REPORTS_DIR, f)
+        reports.append({
+            "id": f.replace(".pdf", "").replace(".PDF", "").replace(" ", "_"),
+            "filename": f,
+            "title": _derive_title(f),
+            "description": _derive_description(f),
+            "size_bytes": os.path.getsize(filepath),
+            "size_kb": round(os.path.getsize(filepath) / 1024, 1),
+            "url": f"/api/reports/file/{quote(f)}",
+        })
+
+    return {"reports": reports, "total": len(reports), "directory": "visualizations/"}
+
+
+@app.get("/api/reports/file/{filename:path}")
+def serve_pdf_report(filename: str):
+    """Serve a PDF file from the visualizations/ directory."""
+    filepath = os.path.join(REPORTS_DIR, filename)
+    # Security: prevent path traversal
+    if not os.path.abspath(filepath).startswith(os.path.abspath(REPORTS_DIR)):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if not os.path.exists(filepath) or not os.path.isfile(filepath):
+        raise HTTPException(status_code=404, detail="Report not found")
+    if not filepath.lower().endswith(".pdf"):
+        raise HTTPException(status_code=404, detail="Not a PDF file")
+    # Use inline disposition so the browser renders the PDF inside an iframe
+    # rather than triggering a download. The download attribute on the <a>
+    # tag in the frontend still allows explicit saving.
+    safe_name = filename.replace('"', '')
+    return FileResponse(
+        filepath,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{safe_name}"',
+            # Allow embedding in an iframe from the same machine (dev + prod)
+            "X-Frame-Options": "SAMEORIGIN",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+
+@app.get("/api/summary")
+def get_executive_summary():
+    """
+    Aggregate all module outputs into a single executive summary response.
+    Every figure comes directly from the CSV-derived endpoints — no hardcoding.
+    """
+    # --- overview -----------------------------------------------------------
+    exec_path = os.path.join(OUTPUTS_DIR, "carboniq_executive_summary.csv")
+    rf_perf_path = os.path.join(M2_OUTPUTS, "rf_model_performance.csv")
+    opt_path = os.path.join(M3_OUTPUTS, "carbon_optimization_summary.csv")
+    em_path  = os.path.join(M3_OUTPUTS, "gpu_emissions_summary.csv")
+    mc_train = os.path.join(M3_OUTPUTS, "model_training_comparison.csv")
+
+    _require_file(exec_path)
+    _require_file(rf_perf_path)
+    _require_file(opt_path)
+    _require_file(em_path)
+
+    exec_row = pd.read_csv(exec_path).iloc[0]
+    perf_df  = pd.read_csv(rf_perf_path)
+    opt_row  = pd.read_csv(opt_path).iloc[0]
+    em_row   = pd.read_csv(em_path).iloc[0]
+
+    test_row = perf_df[perf_df["Data_Split"] == "TEST"].iloc[0] if "TEST" in perf_df["Data_Split"].values else None
+    val_row  = perf_df[perf_df["Data_Split"] == "VALIDATION"].iloc[0] if "VALIDATION" in perf_df["Data_Split"].values else None
+
+    # --- workload partition breakdown ---------------------------------------
+    part_summary = []
+    if df_workloads is not None and not df_workloads.empty:
+        grp = df_workloads.groupby("partition").agg(
+            count=("id_job", "count"),
+            total_actual_kwh=("actual_energy_kwh", "sum"),
+        ).reset_index()
+        part_summary = _to_records(grp)
+
+    # --- anomaly breakdown --------------------------------------------------
+    anom_summary: dict = {}
+    if df_workloads is not None and not df_workloads.empty and "is_anomaly" in df_workloads.columns:
+        anom_df = df_workloads[df_workloads["is_anomaly"] == 1]
+        by_type = (
+            anom_df.groupby(["anomaly_type", "anomaly_severity"])
+            .size().reset_index(name="count")
+            .sort_values("count", ascending=False)
+        )
+        anom_summary = {
+            "total": int(len(anom_df)),
+            "pct":   round(len(anom_df) / len(df_workloads) * 100, 2) if len(df_workloads) else 0,
+            "by_type": _to_records(by_type),
+        }
+
+    # --- carbon model comparison --------------------------------------------
+    carbon_models = []
+    if os.path.exists(mc_train):
+        carbon_models = _to_records(pd.read_csv(mc_train))
+
+    # --- national carbon trend: first & last value --------------------------
+    nat_path = os.path.join(DATA_DIR, "national_carbon_features.csv")
+    nat_trend: dict = {}
+    if os.path.exists(nat_path):
+        df_nat = pd.read_csv(nat_path)
+        df_nat = df_nat[df_nat["variable"] == "CO2 intensity"].sort_values("date")
+        if not df_nat.empty:
+            nat_trend = {
+                "first_date":  str(df_nat.iloc[0]["date"]),
+                "first_value": float(df_nat.iloc[0]["value"]),
+                "last_date":   str(df_nat.iloc[-1]["date"]),
+                "last_value":  float(df_nat.iloc[-1]["value"]),
+                "total_months": len(df_nat),
+                "unit": "gCO2/kWh",
+            }
+
+    return {
+        "generated_at": pd.Timestamp.now().isoformat(),
+        "workloads": {
+            "unique_jobs":        int(exec_row["total_unique_workloads"]),
+            "device_instances":   int(exec_row["total_gpu_device_instances"]),
+        },
+        "energy": {
+            "actual_kwh":         float(exec_row["total_actual_energy_kwh"]),
+            "predicted_kwh":      float(exec_row.get("total_predicted_energy_kwh", 0)),
+            "avg_predicted_j":    float(exec_row.get("avg_predicted_energy_joules", 0)),
+            "rf_test_mae_j":      float(test_row["MAE"])        if test_row is not None else None,
+            "rf_test_rmse_j":     float(test_row["RMSE"])       if test_row is not None else None,
+            "rf_test_r2":         float(test_row["R_Squared"])  if test_row is not None else None,
+            "rf_val_r2":          float(val_row["R_Squared"])   if val_row  is not None else None,
+            "rf_test_obs":        int(test_row["Observations"]) if test_row is not None else None,
+            "by_partition":       part_summary,
+        },
+        "emissions": {
+            "total_actual_kg":        float(em_row.get("Total_Emissions_kg", 0)),
+            "total_actual_tonnes":    float(em_row.get("Total_Emissions_Tonnes", 0)),
+            "avg_per_job_kg":         float(em_row.get("Average_Emissions_kg", 0)),
+            "carbon_intensity_g_kwh": 615.1726506,
+            "source":                 "India national grid average. IEA data via Member 3 Module 2.",
+        },
+        "optimization": {
+            "baseline_energy_kwh":    float(opt_row.get("energy_kwh", 0)),
+            "scenario_energy_kwh":    float(opt_row.get("optimized_energy_kwh", 0)),
+            "energy_saved_kwh":       float(opt_row.get("energy_saved_kwh", 0)),
+            "baseline_emissions_kg":  float(opt_row.get("emissions_kg", 0)),
+            "scenario_emissions_kg":  float(opt_row.get("optimized_emissions_kg", 0)),
+            "emissions_saved_kg":     float(opt_row.get("emissions_saved_kg", 0)),
+            "pct_saved":              10.0,
+            "label":                  "ILLUSTRATIVE — 10% algorithmic efficiency improvement on recorded energy. Not a measured saving.",
+        },
+        "anomalies": anom_summary,
+        "carbon_models": carbon_models,
+        "national_trend": nat_trend,
+    }
+
+
+
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

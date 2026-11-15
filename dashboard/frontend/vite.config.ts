@@ -13,6 +13,16 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    proxy: {
+      // Proxy all /api/* calls to the FastAPI backend.
+      // This makes the PDF iframe src same-origin (5173→5173),
+      // which prevents browsers from blocking cross-origin iframe embedding.
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: false,
+        secure: false,
+      },
+    },
   },
   build: {
     chunkSizeWarningLimit: 1200,

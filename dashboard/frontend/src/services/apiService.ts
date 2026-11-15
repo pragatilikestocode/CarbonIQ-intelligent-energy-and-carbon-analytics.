@@ -51,6 +51,34 @@ export interface ModelPerfRow { Data_Split: string; Observations: number; MAE: n
 export interface ModelPerfResponse { rows: ModelPerfRow[]; note: string; }
 export interface StateRow { state: string; state_code: string; value: number; national_intensity: number | null; state_national_difference: number | null; }
 export interface CarbonStateResponse { date: string; states: StateRow[]; unit: string; }
+export interface PdfReport {
+  id: string; filename: string; title: string; description: string;
+  size_bytes: number; size_kb: number; url: string;
+}
+export interface ReportsResponse { reports: PdfReport[]; total: number; directory: string; }
+
+export interface ExecutiveSummary {
+  generated_at: string;
+  workloads: { unique_jobs: number; device_instances: number };
+  energy: {
+    actual_kwh: number; predicted_kwh: number; avg_predicted_j: number;
+    rf_test_mae_j: number | null; rf_test_rmse_j: number | null;
+    rf_test_r2: number | null; rf_val_r2: number | null; rf_test_obs: number | null;
+    by_partition: Array<{ partition: string; count: number; total_actual_kwh: number }>;
+  };
+  emissions: {
+    total_actual_kg: number; total_actual_tonnes: number;
+    avg_per_job_kg: number; carbon_intensity_g_kwh: number; source: string;
+  };
+  optimization: {
+    baseline_energy_kwh: number; scenario_energy_kwh: number; energy_saved_kwh: number;
+    baseline_emissions_kg: number; scenario_emissions_kg: number;
+    emissions_saved_kg: number; pct_saved: number; label: string;
+  };
+  anomalies: { total: number; pct: number; by_type: Array<{ anomaly_type: string; anomaly_severity: string; count: number }> };
+  carbon_models: Array<{ Model: string; RMSE: number; MAE: number; MSE: number }>;
+  national_trend: { first_date: string; first_value: number; last_date: string; last_value: number; total_months: number; unit: string };
+}
 
 function buildUrl(path: string, params?: Record<string, string | number | boolean | undefined | null>): string {
   const url = new URL(API_BASE + path);
@@ -79,4 +107,6 @@ export const apiService = {
   carbonEmissionsSummary: () => apiFetch<EmissionsSummary>(buildUrl('/api/carbon/emissions-summary')),
   carbonOptimization: () => apiFetch<OptimizationData>(buildUrl('/api/carbon/optimization')),
   carbonModelComparison: () => apiFetch<{ training: Record<string, unknown>[]; validation: Record<string, unknown>[]; note: string }>(buildUrl('/api/carbon/model-comparison')),
+  reports: () => apiFetch<ReportsResponse>(buildUrl('/api/reports')),
+  summary: () => apiFetch<ExecutiveSummary>(buildUrl('/api/summary')),
 };

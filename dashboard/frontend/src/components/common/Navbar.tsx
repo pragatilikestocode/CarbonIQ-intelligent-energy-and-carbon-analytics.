@@ -8,6 +8,7 @@ import {
   TrendingDown,
   Box,
   BarChart3,
+  ClipboardList,
   CheckCircle2,
   XCircle,
 } from 'lucide-react';
@@ -19,13 +20,14 @@ interface NavbarProps {
 }
 
 const NAV_ITEMS = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'energy', label: 'GPU Energy', icon: Zap },
-  { id: 'anomalies', label: 'Anomaly Detection', icon: AlertTriangle },
-  { id: 'carbon', label: 'Carbon Intelligence', icon: Leaf },
-  { id: 'optimization', label: 'Optimization', icon: TrendingDown },
-  { id: 'twin', label: '3D Digital Twin', icon: Box },
-  { id: 'sas', label: 'SAS Visual Analytics', icon: BarChart3 },
+  { id: 'overview',     label: 'Overview',               icon: LayoutDashboard },
+  { id: 'energy',       label: 'GPU Energy',              icon: Zap },
+  { id: 'anomalies',    label: 'Anomaly Detection',       icon: AlertTriangle },
+  { id: 'carbon',       label: 'Carbon Intelligence',     icon: Leaf },
+  { id: 'optimization', label: 'Optimization',            icon: TrendingDown },
+  { id: 'twin',         label: '3D Digital Twin',         icon: Box },
+  { id: 'sas',          label: 'SAS Visual Analytics',    icon: BarChart3 },
+  { id: 'report',       label: 'Executive Summary',       icon: ClipboardList },
 ];
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
